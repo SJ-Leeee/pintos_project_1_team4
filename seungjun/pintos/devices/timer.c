@@ -28,6 +28,8 @@ static intr_handler_func timer_interrupt;
 static bool too_many_loops(unsigned loops);
 static void busy_wait(int64_t loops);
 static void real_time_sleep(int64_t num, int32_t denom);
+static void wakeup_threads(void);
+static bool list_less_funcc(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 struct list sleep_threads;
 
@@ -101,12 +103,12 @@ void timer_sleep(int64_t ticks) // 5초
 
     struct thread *current = thread_current();    // 현재 스레드
     current->wakeup_tick = timer_ticks() + ticks; // 현재 시간에다가 tick 추가
-    current->status = THREAD_BLOCKED;             // 블락처리(어차피 또함). 이 처리로 ready_list에서 빠짐
+    // current->status = THREAD_BLOCKED;             // 블락처리(어차피 또함). 이 처리로 ready_list에서 빠짐
 
-    enum intr_level old_level = intr_disable();                                // 인터럽트 재우고 시작
-    list_insert_ordered(&sleep_threads, &current->elem, list_less_func, NULL); // 비교해서 삽입
-    thread_block();                                                            // 스레드 멈춤
-    intr_set_level(old_level);                                                 // 인터럽트 시작
+    enum intr_level old_level = intr_disable();                                 // 인터럽트 재우고 시작
+    list_insert_ordered(&sleep_threads, &current->elem, list_less_funcc, NULL); // 비교해서 삽입
+    thread_block();                                                             // 스레드 멈춤
+    intr_set_level(old_level);                                                  // 인터럽트 시작
     // elem은 소속리스트느낌? 즉 ready list랑 sleep list랑 같이 있을 수 없다.
 }
 
@@ -138,7 +140,25 @@ void timer_print_stats(void)
 static void timer_interrupt(struct intr_frame *args UNUSED) // 타이머추가++
 {
     ticks++;
+    wakeup_threads();
     thread_tick();
+}
+
+static void wakeup_threads()
+{
+    if (list_empty(&sleep_threads))
+        return;
+
+    while (!list_empty(&sleep_threads))
+    {
+        struct thread *front_th = list_entry(list_front(&sleep_threads), struct thread, elem);
+
+        if (front_th->wakeup_tick > timer_ticks())
+            break;
+
+        struct thread *wakeup_th = list_entry(list_pop_front(&sleep_threads), struct thread, elem);
+        thread_unblock(wakeup_th);
+    }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
@@ -202,7 +222,7 @@ static void real_time_sleep(int64_t num, int32_t denom)
 }
 
 /* a가 크거나 같으면 false, 반대면 true*/
-bool list_less_func(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+bool list_less_funcc(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
     struct thread *th_a = list_entry(a, struct thread, elem);
     struct thread *th_b = list_entry(b, struct thread, elem);
