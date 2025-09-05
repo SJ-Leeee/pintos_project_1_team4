@@ -3,7 +3,12 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/seungjun/**"
+                // "${workspaceFolder}/seungjun/pintos/include/**",
+                // "${workspaceFolder}/seungjun/pintos/threads/**", 
+                // "${workspaceFolder}/seungjun/pintos/lib/**",
+                // "${workspaceFolder}/seungjun/pintos/devices/**",
+                // "${workspaceFolder}/seungjun/pintos/userprog/**"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
