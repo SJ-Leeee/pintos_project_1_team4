@@ -1,4 +1,5 @@
 #include "devices/timer.h"
+#include "lib/kernel/list.h"
 #include "threads/interrupt.h"
 #include "threads/io.h"
 #include "threads/synch.h"
@@ -7,7 +8,6 @@
 #include <inttypes.h>
 #include <round.h>
 #include <stdio.h>
-
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -29,10 +29,12 @@ static bool too_many_loops(unsigned loops);
 static void busy_wait(int64_t loops);
 static void real_time_sleep(int64_t num, int32_t denom);
 
+struct list sleep_threads;
+
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
-void timer_init(void)
+void timer_init(void) // 전역변수 초기화 타임!!
 {
     /* 8254 input frequency divided by TIMER_FREQ, rounded to
        nearest. */
@@ -43,6 +45,8 @@ void timer_init(void)
     outb(0x40, count >> 8);
 
     intr_register_ext(0x20, timer_interrupt, "8254 Timer");
+
+    list_init(&sleep_threads); // 대기리스트 초기화
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -72,12 +76,12 @@ void timer_calibrate(void)
 }
 
 /* Returns the number of timer ticks since the OS booted. */
-int64_t timer_ticks(void)
+int64_t timer_ticks(void) // 전역변수 가져오기
 {
-    enum intr_level old_level = intr_disable();
-    int64_t t = ticks;
-    intr_set_level(old_level);
-    barrier();
+    enum intr_level old_level = intr_disable(); // 인터럽트 차단
+    int64_t t = ticks;                          // 안전하게 읽기
+    intr_set_level(old_level);                  // 인터럽트 복원
+    barrier();                                  // 컴파일러 최적화 방지
     return t;
 }
 
@@ -89,13 +93,21 @@ int64_t timer_elapsed(int64_t then)
 }
 
 /* Suspends execution for approximately TICKS timer ticks. */
-void timer_sleep(int64_t ticks)
+void timer_sleep(int64_t ticks) // 5초
 {
-    int64_t start = timer_ticks();
+    ASSERT(!intr_context()); // 현재 인터럽트 실행중이었으면 안됨.
+    if (ticks <= 0)
+        return;
 
-    ASSERT(intr_get_level() == INTR_ON);
-    while (timer_elapsed(start) < ticks)
-        thread_yield();
+    struct thread *current = thread_current();    // 현재 스레드
+    current->wakeup_tick = timer_ticks() + ticks; // 현재 시간에다가 tick 추가
+    current->status = THREAD_BLOCKED;             // 블락처리(어차피 또함). 이 처리로 ready_list에서 빠짐
+
+    enum intr_level old_level = intr_disable();                                // 인터럽트 재우고 시작
+    list_insert_ordered(&sleep_threads, &current->elem, list_less_func, NULL); // 비교해서 삽입
+    thread_block();                                                            // 스레드 멈춤
+    intr_set_level(old_level);                                                 // 인터럽트 시작
+    // elem은 소속리스트느낌? 즉 ready list랑 sleep list랑 같이 있을 수 없다.
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -123,7 +135,7 @@ void timer_print_stats(void)
 }
 
 /* Timer interrupt handler. */
-static void timer_interrupt(struct intr_frame *args UNUSED)
+static void timer_interrupt(struct intr_frame *args UNUSED) // 타이머추가++
 {
     ticks++;
     thread_tick();
@@ -187,4 +199,13 @@ static void real_time_sleep(int64_t num, int32_t denom)
         ASSERT(denom % 1000 == 0);
         busy_wait(loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000));
     }
+}
+
+/* a가 크거나 같으면 false, 반대면 true*/
+bool list_less_func(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+    struct thread *th_a = list_entry(a, struct thread, elem);
+    struct thread *th_b = list_entry(b, struct thread, elem);
+
+    return th_a->wakeup_tick < th_b->wakeup_tick;
 }
