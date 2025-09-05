@@ -423,7 +423,7 @@ void list_insert_ordered(struct list *list, struct list_elem *elem, list_less_fu
     ASSERT(less != NULL);
 
     for (e = list_begin(list); e != list_end(list); e = list_next(e))
-        if (less(elem, e, aux))
+        if (less(elem, e, aux)) // 들어온 elem이 e보다 클때!
             break;
     return list_insert(e, elem);
 }
