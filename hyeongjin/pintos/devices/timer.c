@@ -24,9 +24,8 @@ static int64_t ticks;
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
 
-//변수 추가
-static int64_t wakeup_tick = INT64_MAX;
-static struct list sleep_list;  // wakeup_tick 오름차순 유지
+//리스트 추가
+static struct list sleep_list; 
 
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
@@ -107,15 +106,11 @@ timer_sleep (int64_t ticks) {
 
 	struct thread* cur = thread_current();//현재 스레드
 
-	
-	
-
-
 	cur->wake_tick = start + ticks;// 현재시간 + 앞으로 얼마나 자는지(tick) = 언제 깨울지?
 
 	enum intr_level old = intr_disable(); // 임계구역 진입(인터럽트 중지)
 
-	list_insert_ordered(&sleep_list, &cur->elem, wake_tick_less, NULL);//sleep_list에 스레드 tick이 작은 순으로 정렬된 상태로 삽입 
+	list_insert_ordered(&sleep_list, &cur->elem, (list_less_func *)wake_tick_less, NULL);//sleep_list에 스레드 tick이 작은 순으로 정렬된 상태로 삽입 
 	thread_block();// 스레드는 블락상태로 전환
 
 	intr_set_level(old);// 임계구역 종료(인터럽트 다시 재개)
@@ -151,6 +146,19 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();	
+
+	struct list_elem *front_node = list_front(&sleep_list);// sleep_list에서 맨 앞 스레드 빼오기
+
+	while(!list_empty(&sleep_list)){
+		struct thread * t = list_entry(front_node, struct thread, elem);//확실히 이해 ㄴㄴ
+
+		if(t->wake_tick <= ticks){ //지금 스레드의 깨울시간보다 훨씬 지났을때 리스트에서 제거하고 언블락
+			
+			list_pop_front(&sleep_list);
+			thread_unblock(t); //언 블락에서 ready_list로 삽입
+		}
+		else break;
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
