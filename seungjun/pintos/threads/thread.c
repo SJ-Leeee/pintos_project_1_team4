@@ -59,6 +59,8 @@ static void kernel_thread(thread_func *, void *aux);
 static void idle(void *aux UNUSED);
 static struct thread *next_thread_to_run(void);
 static void init_thread(struct thread *, const char *name, int priority);
+static bool priority_insert_helper(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
 static void do_schedule(int status);
 static void schedule(void);
 static tid_t allocate_tid(void);
@@ -199,8 +201,11 @@ tid_t thread_create(const char *name, int priority, thread_func *function, void 
     t->tf.eflags = FLAG_IF;
 
     /* Add to run queue. */
-    thread_unblock(t);
-
+    thread_unblock(t); // 내림차순 삽입됨
+    if (thread_current()->cur_priority < t->cur_priority && !list_empty(&ready_list))
+    {
+        thread_yield();
+    }
     return tid;
 }
 
@@ -210,7 +215,7 @@ tid_t thread_create(const char *name, int priority, thread_func *function, void 
    This function must be called with interrupts turned off.  It
    is usually a better idea to use one of the synchronization
    primitives in synch.h. */
-void thread_block(void)
+void thread_block(void) // 실행중인 스레드 블락상태로 만들기.
 {
     ASSERT(!intr_context());
     ASSERT(intr_get_level() == INTR_OFF);
@@ -234,7 +239,7 @@ void thread_unblock(struct thread *t)
 
     old_level = intr_disable();
     ASSERT(t->status == THREAD_BLOCKED);
-    list_push_back(&ready_list, &t->elem);
+    list_insert_ordered(&ready_list, &t->elem, priority_insert_helper, NULL); // 내림차순 삽입
     t->status = THREAD_READY;
     intr_set_level(old_level);
 }
@@ -288,7 +293,7 @@ void thread_exit(void)
 
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
-void thread_yield(void)
+void thread_yield(void) // 양보함수. 양보해도 뒤로가야되나? 아닌듯.
 {
     struct thread *curr = thread_current();
     enum intr_level old_level;
@@ -296,8 +301,8 @@ void thread_yield(void)
     ASSERT(!intr_context());
 
     old_level = intr_disable();
-    if (curr != idle_thread)
-        list_push_back(&ready_list, &curr->elem);
+    if (curr != idle_thread) // 다시삽입
+        list_insert_ordered(&ready_list, &curr->elem, priority_insert_helper, NULL);
     do_schedule(THREAD_READY);
     intr_set_level(old_level);
 }
@@ -305,13 +310,13 @@ void thread_yield(void)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
-    thread_current()->priority = new_priority;
+    thread_current()->cur_priority = new_priority;
 }
 
 /* Returns the current thread's priority. */
 int thread_get_priority(void)
 {
-    return thread_current()->priority;
+    return thread_current()->cur_priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -401,7 +406,7 @@ static void init_thread(struct thread *t, const char *name, int priority)
     t->status = THREAD_BLOCKED;
     strlcpy(t->name, name, sizeof t->name);
     t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
-    t->priority = priority;
+    t->cur_priority = priority;
     t->magic = THREAD_MAGIC;
 }
 
@@ -534,7 +539,7 @@ static void do_schedule(int status)
     schedule();
 }
 
-static void schedule(void)
+static void schedule(void) // 다음거 실행
 {
     struct thread *curr = running_thread();
     struct thread *next = next_thread_to_run();
@@ -585,4 +590,12 @@ static tid_t allocate_tid(void)
     lock_release(&tid_lock);
 
     return tid;
+}
+
+bool priority_insert_helper(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+    struct thread *th_a = list_entry(a, struct thread, elem);
+    struct thread *th_b = list_entry(b, struct thread, elem);
+
+    return th_a->wakeup_tick > th_b->wakeup_tick;
 }
