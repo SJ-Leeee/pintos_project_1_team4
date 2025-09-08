@@ -320,8 +320,8 @@ void cond_wait(struct condition *cond, struct lock *lock)
     ASSERT(lock_held_by_current_thread(lock));
 
     sema_init(&waiter.semaphore, 0);
-    // list_push_back(&cond->waiters, &waiter.elem);
-    list_insert_ordered(&cond->waiters, &waiter.elem, sema_priority, NULL);
+    list_push_back(&cond->waiters, &waiter.elem);
+    // list_insert_ordered(&cond->waiters, &waiter.elem, sema_priority, NULL);
     lock_release(lock);
     sema_down(&waiter.semaphore);
     lock_acquire(lock);
@@ -336,9 +336,8 @@ static bool sema_priority(const struct list_elem *a, const struct list_elem *b, 
     {
         return false;
     }
-    struct thread *th_a = list_entry(list_front(&sema_a->semaphore.waiters), struct thread, elem);
-    struct thread *th_b = list_entry(list_front(&sema_b->semaphore.waiters), struct thread, elem);
-
+    struct thread *th_a = list_entry(list_begin(&sema_a->semaphore.waiters), struct thread, elem);
+    struct thread *th_b = list_entry(list_begin(&sema_b->semaphore.waiters), struct thread, elem);
     return th_a->cur_priority > th_b->cur_priority;
 }
 
@@ -357,7 +356,10 @@ void cond_signal(struct condition *cond, struct lock *lock UNUSED)
     ASSERT(lock_held_by_current_thread(lock));
 
     if (!list_empty(&cond->waiters))
+    {
+        list_sort(&cond->waiters, sema_priority, 0);
         sema_up(&list_entry(list_pop_front(&cond->waiters), struct semaphore_elem, elem)->semaphore);
+    }
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
@@ -374,3 +376,26 @@ void cond_broadcast(struct condition *cond, struct lock *lock)
     while (!list_empty(&cond->waiters))
         cond_signal(cond, lock);
 }
+
+/* 디버깅 코드*/
+// printf("###sema->waiters\n");
+
+// if (list_empty(&cond->waiters))
+// {
+//     printf("sema->waiters is empty\n");
+// }
+// else
+// {
+//     struct list_elem *e;
+//     int index = 0;
+
+//     // ready_list 순회하면서 각 스레드 정보 출력
+//     for (e = list_begin(&cond->waiters); e != list_end(&cond->waiters); e = list_next(e))
+//     {
+//         struct thread *t = list_entry(list_front(&waiter.semaphore.waiters), struct thread, elem);
+
+//         printf("[%d] name: %s, priority: %d, tid: %d\n", index++, t->name, t->cur_priority, t->tid);
+//     }
+// }
+// printf("### sema->waiters done\n");
+// /* 디버깅 코드 */
