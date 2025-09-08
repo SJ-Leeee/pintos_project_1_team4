@@ -41,7 +41,7 @@
 
    - up or "V": increment the value (and wake up one waiting
    thread, if any). */
-void sema_init(struct semaphore *sema, unsigned value)
+void sema_init(struct semaphore *sema, unsigned value) // 세마포어 초기화
 {
     ASSERT(sema != NULL);
 
@@ -65,10 +65,10 @@ void sema_down(struct semaphore *sema)
     ASSERT(!intr_context());
 
     old_level = intr_disable();
-    while (sema->value == 0)
+    while (sema->value == 0) // 세마포어가 할당할 수 없으면
     {
-        list_push_back(&sema->waiters, &thread_current()->elem);
-        thread_block();
+        list_insert_ordered(&sema->waiters, &thread_current()->elem, priority_insert_helper, NULL); // 대기리스트에 삽입
+        thread_block();                                                                             // 블락
     }
     sema->value--;
     intr_set_level(old_level);
@@ -103,17 +103,52 @@ bool sema_try_down(struct semaphore *sema)
    and wakes up one thread of those waiting for SEMA, if any.
 
    This function may be called from an interrupt handler. */
-void sema_up(struct semaphore *sema)
+void sema_up(struct semaphore *sema) // 깨우기함수
 {
     enum intr_level old_level;
-
+    bool should_yield = false;
     ASSERT(sema != NULL);
 
     old_level = intr_disable();
+    /* 디버깅 코드*/
+    // printf("###sema->waiters\n");
+
+    // if (list_empty(&sema->waiters))
+    // {
+    //     printf("sema->waiters is empty\n");
+    // }
+    // else
+    // {
+    //     struct list_elem *e;
+    //     int index = 0;
+
+    //     // ready_list 순회하면서 각 스레드 정보 출력
+    //     for (e = list_begin(&sema->waiters); e != list_end(&sema->waiters); e = list_next(e))
+    //     {
+    //         struct thread *t = list_entry(e, struct thread, elem);
+    //         printf("[%d] name: %s, priority: %d, tid: %d\n", index++, t->name, t->cur_priority, t->tid);
+    //     }
+    // }
+    // printf("### sema->waiters done\n");
+    /* 디버깅 코드 */
     if (!list_empty(&sema->waiters))
-        thread_unblock(list_entry(list_pop_front(&sema->waiters), struct thread, elem));
+    {
+        struct list_elem *e = list_pop_front(&sema->waiters);
+        struct thread *semaup_th = list_entry(e, struct thread, elem);
+        thread_unblock(semaup_th);
+        if (thread_current()->cur_priority < semaup_th->cur_priority)
+        {
+            should_yield = true;
+        }
+    }
+
     sema->value++;
     intr_set_level(old_level);
+
+    if (should_yield)
+    {
+        thread_yield();
+    }
 }
 
 static void sema_test_helper(void *sema_);
@@ -182,7 +217,7 @@ void lock_init(struct lock *lock)
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
-void lock_acquire(struct lock *lock)
+void lock_acquire(struct lock *lock) // 현재스레드가 lock을 잡는다
 {
     ASSERT(lock != NULL);
     ASSERT(!intr_context());
@@ -198,7 +233,7 @@ void lock_acquire(struct lock *lock)
 
    This function will not sleep, so it may be called within an
    interrupt handler. */
-bool lock_try_acquire(struct lock *lock)
+bool lock_try_acquire(struct lock *lock) // 대기리스트 없이 lock획득
 {
     bool success;
 
@@ -217,7 +252,7 @@ bool lock_try_acquire(struct lock *lock)
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
    handler. */
-void lock_release(struct lock *lock)
+void lock_release(struct lock *lock) // lock 해제
 {
     ASSERT(lock != NULL);
     ASSERT(lock_held_by_current_thread(lock));
