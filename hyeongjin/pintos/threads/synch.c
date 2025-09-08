@@ -58,7 +58,7 @@ sema_init (struct semaphore *sema, unsigned value) {
    thread will probably turn interrupts back on. This is
    sema_down function. */
 void
-sema_down (struct semaphore *sema) {
+sema_down (struct semaphore *sema) {//자원을 얻을 수 있을 때까지 무조건 기다리는 함수
 	enum intr_level old_level;
 
 	ASSERT (sema != NULL);
@@ -79,7 +79,7 @@ sema_down (struct semaphore *sema) {
 
    This function may be called from an interrupt handler. */
 bool
-sema_try_down (struct semaphore *sema) {
+sema_try_down (struct semaphore *sema) {//자원이 있는지 한 번만 확인하고 안되면 바로 포기하는 함수
 	enum intr_level old_level;
 	bool success;
 
