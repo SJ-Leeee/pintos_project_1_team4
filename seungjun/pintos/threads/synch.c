@@ -41,6 +41,8 @@
 
    - up or "V": increment the value (and wake up one waiting
    thread, if any). */
+
+static bool sema_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
 void sema_init(struct semaphore *sema, unsigned value) // 세마포어 초기화
 {
     ASSERT(sema != NULL);
@@ -318,10 +320,26 @@ void cond_wait(struct condition *cond, struct lock *lock)
     ASSERT(lock_held_by_current_thread(lock));
 
     sema_init(&waiter.semaphore, 0);
-    list_push_back(&cond->waiters, &waiter.elem);
+    // list_push_back(&cond->waiters, &waiter.elem);
+    list_insert_ordered(&cond->waiters, &waiter.elem, sema_priority, NULL);
     lock_release(lock);
     sema_down(&waiter.semaphore);
     lock_acquire(lock);
+}
+
+static bool sema_priority(const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+    struct semaphore_elem *sema_a = list_entry(a, struct semaphore_elem, elem);
+    struct semaphore_elem *sema_b = list_entry(b, struct semaphore_elem, elem);
+
+    if (list_empty(&sema_a->semaphore.waiters) || list_empty(&sema_b->semaphore.waiters))
+    {
+        return false;
+    }
+    struct thread *th_a = list_entry(list_front(&sema_a->semaphore.waiters), struct thread, elem);
+    struct thread *th_b = list_entry(list_front(&sema_b->semaphore.waiters), struct thread, elem);
+
+    return th_a->cur_priority > th_b->cur_priority;
 }
 
 /* If any threads are waiting on COND (protected by LOCK), then
