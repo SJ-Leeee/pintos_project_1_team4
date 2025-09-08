@@ -95,7 +95,7 @@ int64_t timer_elapsed(int64_t then)
 }
 
 /* Suspends execution for approximately TICKS timer ticks. */
-void timer_sleep(int64_t ticks) // 5초
+void timer_sleep(int64_t ticks) // 요놈은 인터럽트 수준이아니다.
 {
     ASSERT(!intr_context()); // 현재 인터럽트 실행중이었으면 안됨.
     if (ticks <= 0)
