@@ -1,10 +1,11 @@
 #!/bin/bash
 if [ "$BASH" != "" ]; then
-	SOURCE="${BASH_SOURCE[0]}";
+  SOURCE="${BASH_SOURCE[0]}"
 else
-	SOURCE="$0";
-fi;
+  SOURCE="$0"
+fi
 
+# 심볼릭 링크 따라 실제 파일 경로 찾기
 while [ -h "$SOURCE" ]; do
   DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
   SOURCE="$(readlink "$SOURCE")"
@@ -12,4 +13,7 @@ while [ -h "$SOURCE" ]; do
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 
-PATH=$DIR/utils:$PATH
+# PintOS 유틸과 Perl 모듈 경로 등록
+export PATH="$DIR/utils:$PATH"
+export PERL5LIB="$DIR:$PERL5LIB"
+
