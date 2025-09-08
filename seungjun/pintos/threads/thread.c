@@ -53,13 +53,13 @@ static unsigned thread_ticks; /* # of timer ticks since last yield. */
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
+bool priority_insert_helper(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 static void kernel_thread(thread_func *, void *aux);
 
 static void idle(void *aux UNUSED);
 static struct thread *next_thread_to_run(void);
 static void init_thread(struct thread *, const char *name, int priority);
-static bool priority_insert_helper(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 static void do_schedule(int status);
 static void schedule(void);
@@ -628,7 +628,7 @@ static tid_t allocate_tid(void)
     return tid;
 }
 
-static bool priority_insert_helper(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+bool priority_insert_helper(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
     struct thread *th_a = list_entry(a, struct thread, elem);
     struct thread *th_b = list_entry(b, struct thread, elem);
