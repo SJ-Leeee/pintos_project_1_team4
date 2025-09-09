@@ -187,6 +187,7 @@ tid_t thread_create(const char *name, int priority, thread_func *function, void 
 
     /* Initialize thread. */
     init_thread(t, name, priority);
+    list_init(&t->donations); // donations는 초기화시켜야 함.
     tid = t->tid = allocate_tid();
 
     /* Call the kernel_thread if it scheduled.
@@ -442,7 +443,8 @@ static void init_thread(struct thread *t, const char *name, int priority)
     t->status = THREAD_BLOCKED;
     strlcpy(t->name, name, sizeof t->name);
     t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
-    t->cur_priority = priority;
+    t->cur_priority = priority;  // 현재도 추가
+    t->init_priority = priority; // init도 추가
     t->magic = THREAD_MAGIC;
 }
 
