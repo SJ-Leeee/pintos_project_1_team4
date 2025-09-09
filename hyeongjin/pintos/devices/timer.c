@@ -110,7 +110,8 @@ timer_sleep (int64_t ticks) {
 
 	enum intr_level old = intr_disable(); // 임계구역 진입(인터럽트 중지)
 
-	list_insert_ordered(&sleep_list, &cur->elem, (list_less_func *)wake_tick_less, NULL);//sleep_list에 스레드 tick이 작은 순으로 정렬된 상태로 삽입 
+	//sleep_list에 스레드 tick이 작은 순으로 정렬된 상태로 삽입 
+	list_insert_ordered(&sleep_list, &cur->elem, wake_tick_less, NULL);
 	thread_block();// 스레드는 블락상태로 전환
 
 	intr_set_level(old);// 임계구역 종료(인터럽트 다시 재개)
@@ -145,20 +146,25 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
+	bool good = false;
 	thread_tick ();	
 
-	struct list_elem *front_node = list_front(&sleep_list);// sleep_list에서 맨 앞 스레드 빼오기
+	//struct list_elem *front_node = list_front(&sleep_list);// sleep_list에서 맨 앞 스레드 빼오기
 
 	while(!list_empty(&sleep_list)){
-		struct thread * t = list_entry(front_node, struct thread, elem);//확실히 이해 ㄴㄴ
+		struct thread * t = list_entry(list_front(&sleep_list), struct thread, elem);
 
 		if(t->wake_tick <= ticks){ //지금 스레드의 깨울시간보다 훨씬 지났을때 리스트에서 제거하고 언블락
-			
 			list_pop_front(&sleep_list);
 			thread_unblock(t); //언 블락에서 ready_list로 삽입
+			
 		}
 		else break;
 	}
+
+	// if(){
+	// 	intr_yield_on_return();
+	// }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
@@ -221,8 +227,8 @@ real_time_sleep (int64_t num, int32_t denom) {
 static bool 
 wake_tick_less (const struct list_elem *a, const struct list_elem *b, void *aux){
 	
-	struct thread *t1 = list_entry(a, struct thread, elem);
-	struct thread *t2 = list_entry(b, struct thread, elem);
+	struct thread *t1 = list_entry(a, struct thread, sleep_elem);
+	struct thread *t2 = list_entry(b, struct thread, sleep_elem);
 
 	return t1->wake_tick < t2->wake_tick;
 }
