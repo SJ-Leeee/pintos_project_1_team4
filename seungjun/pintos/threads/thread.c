@@ -54,6 +54,7 @@ static unsigned thread_ticks; /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 bool priority_insert_helper(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool priority_insert_helper_donation(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 static void kernel_thread(thread_func *, void *aux);
 
@@ -635,6 +636,14 @@ bool priority_insert_helper(const struct list_elem *a, const struct list_elem *b
 {
     struct thread *th_a = list_entry(a, struct thread, elem);
     struct thread *th_b = list_entry(b, struct thread, elem);
+
+    return th_a->cur_priority > th_b->cur_priority;
+}
+
+bool priority_insert_helper_donation(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+    struct thread *th_a = list_entry(a, struct thread, donation_elem);
+    struct thread *th_b = list_entry(b, struct thread, donation_elem);
 
     return th_a->cur_priority > th_b->cur_priority;
 }
