@@ -17,7 +17,7 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
-/* Number of timer ticks since OS booted. */
+/* Number of timer ticks since OS booted.*/
 static int64_t ticks;
 
 /* Number of loops per timer tick.
@@ -28,12 +28,17 @@ static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
+static struct list sleep_list;
+static struct thread *idle_thread;
+static bool less_wake(const struct list_elem *prev, const struct list_elem *curr,void *aux UNUSED);
+
 
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
 void
 timer_init (void) {
+	list_init(&sleep_list);
 	/* 8254 input frequency divided by TIMER_FREQ, rounded to
 	   nearest. */
 	uint16_t count = (1193180 + TIMER_FREQ / 2) / TIMER_FREQ;
@@ -87,14 +92,22 @@ timer_elapsed (int64_t then) {
 	return timer_ticks () - then;
 }
 
+
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks ();
-
-	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	if(ticks < 0)return;
+	/*스레드 호출*/
+	struct thread *curr = thread_current();
+	ASSERT(curr != idle_thread)
+	/*구조체에 틱 값 주기*/
+	curr->wake_tick = timer_ticks()+ticks;
+	/*sleep list에 연결 노드 넣기*/
+	list_insert_ordered(&sleep_list,&curr->sleep_elem,less_wake,NULL);
+	/*멈추기*/
+	intr_disable();
+	thread_block();
+	intr_enable();
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -125,7 +138,19 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
-	thread_tick ();
+	struct list_elem *e;
+	if(list_empty(&sleep_list)){
+		return;
+	} else {for(e = list_begin(&sleep_list); e != list_end(&sleep_list);){
+		struct thread *t = list_entry(e,struct thread, sleep_elem);
+		if(ticks < t->wake_tick ){
+			break;
+		}else{
+			e = list_remove(e);
+			thread_unblock(t);                   
+		}
+		
+	}}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
@@ -183,4 +208,14 @@ real_time_sleep (int64_t num, int32_t denom) {
 		ASSERT (denom % 1000 == 0);
 		busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000));
 	}
+}
+
+static bool less_wake (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+  const struct thread *ta = list_entry(a, struct thread, sleep_elem);
+  const struct thread *tb = list_entry(b, struct thread, sleep_elem);
+
+  if (ta->wake_tick != tb->wake_tick)
+    return ta->wake_tick < tb->wake_tick;   // a가 더 이르면 a가 앞
+// priority 구현 후 변경
+  return ta->tid < tb->tid;
 }

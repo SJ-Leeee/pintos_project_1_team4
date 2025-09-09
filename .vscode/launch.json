@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "[Week 9]Threads Debug",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "yeeun/pintos/threads/build/kernel.o",
+      "cwd": "yeeun/pintos/threads",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "miDebuggerServerAddress": "localhost:1234",
+    },
+    {
+      "name": "[Week 10-11]User Program Debug",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "yeeun/pintos/userprog/build/kernel.o",
+      "cwd": "yeeun/pintos/userprog",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "miDebuggerServerAddress": "localhost:1234",
+    },
+    {
+      "name": "[Week 12-13]VM Debug",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "yeeun/pintos/vm/build/kernel.o",
+      "cwd": "yeeun/pintos/vm",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "miDebuggerServerAddress": "localhost:1234"
+    },
+  ]
+}
