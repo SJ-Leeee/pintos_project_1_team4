@@ -310,6 +310,7 @@ void thread_yield(void) // 양보함수. 양보해도 뒤로가야되나? 아닌
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority) // 현재프로세스가 낮아지면 바로 다음스레드 선점
 {
+    thread_current()->init_priority = new_priority;
     set_priority_self();
     thread_test_preemption();
 }

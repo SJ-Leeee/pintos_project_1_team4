@@ -168,6 +168,7 @@ void lock_release(struct lock *lock) // lock 해제
 {
     ASSERT(lock != NULL);
     ASSERT(lock_held_by_current_thread(lock));
+
     remove_donation_lock(lock); // 홀더가 가진 기부리스트에서 해당 lock을 기다리는 스레드를 삭제
     set_priority_self();        // 홀더가 가진 기부리스트중에서 다시 높은 우선순위를 현재우선순위로 변경
 
