@@ -54,6 +54,7 @@ static unsigned thread_ticks; /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 bool priority_insert_helper(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool priority_insert_helper_donation(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 static void kernel_thread(thread_func *, void *aux);
 
@@ -203,10 +204,7 @@ tid_t thread_create(const char *name, int priority, thread_func *function, void 
     /* Add to run queue. */
     thread_unblock(t); // 내림차순 삽입됨
 
-    if (thread_current()->cur_priority < t->cur_priority)
-    {
-        thread_yield();
-    }
+    thread_test_preemption();
     return tid;
 }
 
@@ -241,27 +239,7 @@ void thread_unblock(struct thread *t)
     old_level = intr_disable();
     ASSERT(t->status == THREAD_BLOCKED);
     list_insert_ordered(&ready_list, &t->elem, priority_insert_helper, NULL); // 내림차순 삽입
-    /* 디버깅 코드*/
-    // printf("###readylist\n");
 
-    // if (list_empty(&ready_list))
-    // {
-    //     printf("ready_list is empty\n");
-    // }
-    // else
-    // {
-    //     struct list_elem *e;
-    //     int index = 0;
-
-    //     // ready_list 순회하면서 각 스레드 정보 출력
-    //     for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e))
-    //     {
-    //         struct thread *t = list_entry(e, struct thread, elem);
-    //         printf("[%d] name: %s, priority: %d, tid: %d\n", index++, t->name, t->cur_priority, t->tid);
-    //     }
-    // }
-    // printf("### readylist done\n");
-    /* 디버깅 코드 */
     t->status = THREAD_READY;
     intr_set_level(old_level);
 }
@@ -332,21 +310,9 @@ void thread_yield(void) // 양보함수. 양보해도 뒤로가야되나? 아닌
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority) // 현재프로세스가 낮아지면 바로 다음스레드 선점
 {
-    enum intr_level old_level = intr_disable(); // 인터럽트 비활성화
-
-    thread_current()->cur_priority = new_priority;
-    if (!list_empty(&ready_list))
-    {
-        struct thread *first_th = list_entry(list_front(&ready_list), struct thread, elem);
-        if (first_th->cur_priority > new_priority)
-        {
-            intr_set_level(old_level);
-            thread_yield();
-            return;
-        }
-    }
-
-    intr_set_level(old_level);
+    thread_current()->init_priority = new_priority;
+    set_priority_self();
+    thread_test_preemption();
 }
 
 /* Returns the current thread's priority. */
@@ -442,7 +408,10 @@ static void init_thread(struct thread *t, const char *name, int priority)
     t->status = THREAD_BLOCKED;
     strlcpy(t->name, name, sizeof t->name);
     t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
-    t->cur_priority = priority;
+    t->cur_priority = priority;  // 현재도 추가
+    t->init_priority = priority; // init도 추가
+    t->wait_lock = NULL;
+    list_init(&t->donations); // donations는 초기화시켜야 함.
     t->magic = THREAD_MAGIC;
 }
 
@@ -634,4 +603,19 @@ bool priority_insert_helper(const struct list_elem *a, const struct list_elem *b
     struct thread *th_b = list_entry(b, struct thread, elem);
 
     return th_a->cur_priority > th_b->cur_priority;
+}
+
+bool priority_insert_helper_donation(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+    struct thread *th_a = list_entry(a, struct thread, donation_elem);
+    struct thread *th_b = list_entry(b, struct thread, donation_elem);
+
+    return th_a->cur_priority > th_b->cur_priority;
+}
+
+void thread_test_preemption(void)
+{
+    if (!list_empty(&ready_list) &&
+        thread_current()->cur_priority < list_entry(list_front(&ready_list), struct thread, elem)->cur_priority)
+        thread_yield();
 }
