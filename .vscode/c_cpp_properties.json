@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/seungjun/**"
+                // "${workspaceFolder}/seungjun/pintos/include/**",
+                // "${workspaceFolder}/seungjun/pintos/threads/**", 
+                // "${workspaceFolder}/seungjun/pintos/lib/**",
+                // "${workspaceFolder}/seungjun/pintos/devices/**",
+                // "${workspaceFolder}/seungjun/pintos/userprog/**"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}

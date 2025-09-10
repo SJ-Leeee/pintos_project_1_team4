@@ -92,8 +92,11 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 
+	int64_t wake_tick;                    /* 일어날 tick 저장*/
+
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+	struct list_elem sleep_elem;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -113,6 +116,7 @@ struct thread {
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
+extern struct list ready_list;
 
 void thread_init (void);
 void thread_start (void);
@@ -142,5 +146,7 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+bool priority_compare(const struct list_elem *a, const struct list_elem *b, void *aux);
+
 
 #endif /* threads/thread.h */

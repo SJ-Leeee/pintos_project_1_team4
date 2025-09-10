@@ -1,5 +1,15 @@
 {
     "files.associations": {
-        "typeinfo": "c"
+        "string.h": "c",
+        "stdio.h": "c",
+        "stddef.h": "c",
+        "random.h": "c",
+        "thread.h": "c",
+        "intrinsic.h": "c",
+        "interrupt.h": "c",
+        "flags.h": "c",
+        "mmu.h": "c",
+        "list.h": "c",
+        "timer.h": "c"
     }
 }
